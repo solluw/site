@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fading Text</title>
+  <style>
+    body {
+      background-color: black;
+    }
+    
+    .fade-in {
+      color: white;
+      text-align: center;
+      opacity: 0;
+      animation: fadeIn 1.5s ease-in-out forwards;
+    }
+    
+    @keyframes fadeIn {
+      0% {
+        opacity: 0;
+      }
+      
+      100% {
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="fade-in">Welcome to the Fading Text Website!</h1>
+</body>
+</html>
